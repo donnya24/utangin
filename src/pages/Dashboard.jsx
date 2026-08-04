@@ -75,7 +75,9 @@ export default function Dashboard() {
           <h1 className="text-xl font-bold">
             Halo, {user?.displayName?.split(" ")[0] || "Pemilik"} 👋
           </h1>
-          <p className="text-sm text-slate-500">Ringkasan keuangan Anda.</p>
+          <p className="text-sm text-slate-500">
+            Kelola ringkasan keuangan Anda!
+          </p>
         </div>
         <button
           onClick={() => setShowAddTx(true)}
