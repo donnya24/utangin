@@ -63,7 +63,7 @@ export default function Login() {
           </h1>
           <p className="text-slate-500 mt-2 text-sm leading-relaxed">
             Pencatat hutang piutang <br />
-            untuk toko & UMKM Indonesia
+            untuk UMKM Indonesia
           </p>
         </div>
 
