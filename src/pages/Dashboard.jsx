@@ -153,7 +153,7 @@ export default function Dashboard() {
                         {tx.contactName}
                       </h4>
                       <p className="text-xs text-slate-400">
-                        {tx.description || "Tanpa keterangan"} ·{" "}
+                        {tx.description ? tx.description + " · " : ""}
                         {formatDateShort(tx.createdAt)}
                       </p>
                     </div>

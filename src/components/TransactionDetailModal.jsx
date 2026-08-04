@@ -77,14 +77,18 @@ export default function TransactionDetailModal({ transaction, onClose }) {
             <span className="text-slate-500">Nama</span>
             <span className="font-medium">{currentTx.contactName}</span>
           </div>
-
-          {currentTx.phone && (
+          // Di bagian detail, ganti jadi:
+          {currentTx.phone ? (
             <div className="flex justify-between">
               <span className="text-slate-500">Telepon</span>
               <span>{currentTx.phone}</span>
             </div>
+          ) : (
+            <div className="flex justify-between">
+              <span className="text-slate-500">Telepon</span>
+              <span className="text-slate-400 text-xs">-</span>
+            </div>
           )}
-
           <div className="flex justify-between">
             <span className="text-slate-500">Total</span>
             <b
@@ -97,12 +101,10 @@ export default function TransactionDetailModal({ transaction, onClose }) {
               Rp {currentTx.amount.toLocaleString("id")}
             </b>
           </div>
-
           <div className="flex justify-between">
             <span className="text-slate-500">Sudah Dibayar</span>
             <span>Rp {(currentTx.paidAmount || 0).toLocaleString("id")}</span>
           </div>
-
           <div className="flex justify-between border-t pt-2">
             <span className="text-slate-500">Sisa</span>
             <b
@@ -111,7 +113,6 @@ export default function TransactionDetailModal({ transaction, onClose }) {
               Rp {remaining.toLocaleString("id")}
             </b>
           </div>
-
           <div className="flex justify-between">
             <span className="text-slate-500">Status</span>
             <span
@@ -124,12 +125,10 @@ export default function TransactionDetailModal({ transaction, onClose }) {
               {isLunas ? "Lunas" : "Belum Lunas"}
             </span>
           </div>
-
           <div className="flex justify-between">
             <span className="text-slate-500">Tanggal</span>
             <span>{formatDate(currentTx.createdAt)}</span>
           </div>
-
           {/* Keterangan lengkap */}
           <div className="flex justify-between border-t pt-2">
             <span className="text-slate-500">Keterangan</span>

@@ -181,8 +181,10 @@ export default function Transactions() {
             </div>
             <div>
               <h4 className="font-semibold text-sm">{tx.contactName}</h4>
+              // Di renderItem, bagian:
               <p className="text-xs text-slate-400">
-                {tx.phone && "📱 " + tx.phone} · {formatDateShort(tx.createdAt)}
+                {tx.phone ? "📱 " + tx.phone + " · " : ""}
+                {formatDateShort(tx.createdAt)}
               </p>
             </div>
           </div>

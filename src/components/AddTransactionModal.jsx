@@ -22,7 +22,6 @@ export default function AddTransactionModal({ onClose }) {
   };
 
   const handleDescriptionChange = (e) => {
-    // Batasi maksimal 200 karakter
     if (e.target.value.length <= 200) {
       setDescription(e.target.value);
     }
@@ -31,7 +30,10 @@ export default function AddTransactionModal({ onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const rawAmount = parseRupiahInput(displayAmount);
-    if (!name || !phone || rawAmount <= 0) return;
+    if (!name || rawAmount <= 0) {
+      setToast({ message: "Nama dan nominal wajib diisi.", type: "error" });
+      return;
+    }
     try {
       await addTransaction(
         user.uid,
@@ -58,64 +60,105 @@ export default function AddTransactionModal({ onClose }) {
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            className="w-full border rounded-xl px-4 py-2.5"
-            placeholder="Nama Pelanggan/Supplier"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-          <input
-            className="w-full border rounded-xl px-4 py-2.5"
-            placeholder="Nomor WhatsApp (08xxx)"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            required
-          />
-          <div className="flex space-x-3">
-            <label
-              className={`flex-1 p-3 text-center border-2 rounded-xl cursor-pointer ${txType === "piutang" ? "border-emerald-500 bg-emerald-50" : "border-slate-200"}`}
-            >
-              <input
-                type="radio"
-                value="piutang"
-                checked={txType === "piutang"}
-                onChange={() => setTxType("piutang")}
-                className="hidden"
-              />
-              Piutang
+          {/* Nama - Wajib */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Nama <span className="text-red-500">*</span>
             </label>
-            <label
-              className={`flex-1 p-3 text-center border-2 rounded-xl cursor-pointer ${txType === "hutang" ? "border-rose-500 bg-rose-50" : "border-slate-200"}`}
-            >
-              <input
-                type="radio"
-                value="hutang"
-                checked={txType === "hutang"}
-                onChange={() => setTxType("hutang")}
-                className="hidden"
-              />
-              Hutang
-            </label>
-          </div>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
-              Rp
-            </span>
             <input
-              className="w-full border rounded-xl pl-10 pr-4 py-2.5 text-right"
-              type="text"
-              inputMode="numeric"
-              placeholder="0"
-              value={displayAmount}
-              onChange={handleAmountChange}
+              className="w-full border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              placeholder="Nama Pelanggan/Supplier"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               required
             />
           </div>
+
+          {/* Nomor WhatsApp - Opsional */}
           <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Nomor WhatsApp{" "}
+              <span className="text-slate-400 text-xs">(opsional)</span>
+            </label>
+            <input
+              className="w-full border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              placeholder="0812-3456-7890"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+
+          {/* Tipe Transaksi */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Tipe <span className="text-red-500">*</span>
+            </label>
+            <div className="flex space-x-3">
+              <label
+                className={`flex-1 p-3 text-center border-2 rounded-xl cursor-pointer transition ${
+                  txType === "piutang"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  value="piutang"
+                  checked={txType === "piutang"}
+                  onChange={() => setTxType("piutang")}
+                  className="hidden"
+                />
+                <span className="text-sm font-medium">📥 Piutang</span>
+              </label>
+              <label
+                className={`flex-1 p-3 text-center border-2 rounded-xl cursor-pointer transition ${
+                  txType === "hutang"
+                    ? "border-rose-500 bg-rose-50 text-rose-700"
+                    : "border-slate-200 text-slate-500 hover:border-slate-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  value="hutang"
+                  checked={txType === "hutang"}
+                  onChange={() => setTxType("hutang")}
+                  className="hidden"
+                />
+                <span className="text-sm font-medium">📤 Hutang</span>
+              </label>
+            </div>
+          </div>
+
+          {/* Nominal */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Nominal <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                Rp
+              </span>
+              <input
+                className="w-full border rounded-xl pl-10 pr-4 py-2.5 text-right focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                type="text"
+                inputMode="numeric"
+                placeholder="0"
+                value={displayAmount}
+                onChange={handleAmountChange}
+                required
+              />
+            </div>
+          </div>
+
+          {/* Keterangan - Opsional */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Keterangan{" "}
+              <span className="text-slate-400 text-xs">(opsional)</span>
+            </label>
             <textarea
-              className="w-full border rounded-xl px-4 py-2.5 resize-none"
-              placeholder="Keterangan (opsional, maks 200 karakter)"
+              className="w-full border rounded-xl px-4 py-2.5 resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              placeholder="Contoh: Belanja sembako tempo"
               value={description}
               onChange={handleDescriptionChange}
               rows={2}
@@ -125,11 +168,12 @@ export default function AddTransactionModal({ onClose }) {
               {description.length}/200
             </p>
           </div>
+
           <button
             type="submit"
-            className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium"
+            className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-medium py-3 rounded-xl transition shadow-sm"
           >
-            Catat
+            Catat Transaksi
           </button>
         </form>
       </div>
