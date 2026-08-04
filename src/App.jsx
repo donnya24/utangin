@@ -3,7 +3,6 @@ import { useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
-import Contacts from "./pages/Contacts";
 import Transactions from "./pages/Transactions";
 import Settings from "./pages/Settings";
 
@@ -29,7 +28,6 @@ export default function App() {
           }
         >
           <Route path="/" element={<Dashboard />} />
-          <Route path="/contacts" element={<Contacts />} />
           <Route path="/transactions" element={<Transactions />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
