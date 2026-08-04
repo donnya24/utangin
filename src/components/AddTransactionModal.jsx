@@ -1,30 +1,43 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import useContacts from "../hooks/useContacts";
 import { addTransaction } from "../services/firestoreService";
 import { useAuth } from "../context/AuthContext";
 import Toast from "./Toast";
+import { formatRupiahInput, parseRupiahInput } from "../utils/format";
 
 export default function AddTransactionModal({ onClose }) {
   const { user } = useAuth();
-  const contacts = useContacts();
-  const [contactId, setContactId] = useState("");
+  const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [txType, setTxType] = useState("piutang");
-  const [amount, setAmount] = useState("");
+  const [displayAmount, setDisplayAmount] = useState("");
   const [description, setDescription] = useState("");
   const [toast, setToast] = useState(null);
 
-  const selectedContact = contacts.find((c) => c.id === contactId);
+  const handleAmountChange = (e) => {
+    const rawValue = e.target.value;
+    const numeric = rawValue.replace(/\D/g, "");
+    if (numeric.length > 12) return;
+    setDisplayAmount(formatRupiahInput(numeric));
+  };
+
+  const handleDescriptionChange = (e) => {
+    // Batasi maksimal 200 karakter
+    if (e.target.value.length <= 200) {
+      setDescription(e.target.value);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!contactId || !amount) return;
+    const rawAmount = parseRupiahInput(displayAmount);
+    if (!name || !phone || rawAmount <= 0) return;
     try {
       await addTransaction(
         user.uid,
-        contactId,
-        selectedContact.name,
-        amount,
+        name,
+        phone,
+        rawAmount,
         txType,
         description,
       );
@@ -44,73 +57,81 @@ export default function AddTransactionModal({ onClose }) {
             <X size={20} />
           </button>
         </div>
-        {contacts.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Belum ada kontak. Tambahkan di menu Kontak terlebih dahulu.
-          </p>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <select
-              className="w-full border rounded-xl px-4 py-2.5"
-              value={contactId}
-              onChange={(e) => setContactId(e.target.value)}
-              required
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            className="w-full border rounded-xl px-4 py-2.5"
+            placeholder="Nama Pelanggan/Supplier"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+          <input
+            className="w-full border rounded-xl px-4 py-2.5"
+            placeholder="Nomor WhatsApp (08xxx)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            required
+          />
+          <div className="flex space-x-3">
+            <label
+              className={`flex-1 p-3 text-center border-2 rounded-xl cursor-pointer ${txType === "piutang" ? "border-emerald-500 bg-emerald-50" : "border-slate-200"}`}
             >
-              <option value="">Pilih Kontak</option>
-              {contacts.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.type === "customer" ? "Pelanggan" : "Supplier"})
-                </option>
-              ))}
-            </select>
-            <div className="flex space-x-3">
-              <label
-                className={`flex-1 p-3 text-center border-2 rounded-xl cursor-pointer ${txType === "piutang" ? "border-emerald-500 bg-emerald-50" : "border-slate-200"}`}
-              >
-                <input
-                  type="radio"
-                  value="piutang"
-                  checked={txType === "piutang"}
-                  onChange={() => setTxType("piutang")}
-                  className="hidden"
-                />
-                Piutang
-              </label>
-              <label
-                className={`flex-1 p-3 text-center border-2 rounded-xl cursor-pointer ${txType === "hutang" ? "border-rose-500 bg-rose-50" : "border-slate-200"}`}
-              >
-                <input
-                  type="radio"
-                  value="hutang"
-                  checked={txType === "hutang"}
-                  onChange={() => setTxType("hutang")}
-                  className="hidden"
-                />
-                Hutang
-              </label>
-            </div>
+              <input
+                type="radio"
+                value="piutang"
+                checked={txType === "piutang"}
+                onChange={() => setTxType("piutang")}
+                className="hidden"
+              />
+              Piutang
+            </label>
+            <label
+              className={`flex-1 p-3 text-center border-2 rounded-xl cursor-pointer ${txType === "hutang" ? "border-rose-500 bg-rose-50" : "border-slate-200"}`}
+            >
+              <input
+                type="radio"
+                value="hutang"
+                checked={txType === "hutang"}
+                onChange={() => setTxType("hutang")}
+                className="hidden"
+              />
+              Hutang
+            </label>
+          </div>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+              Rp
+            </span>
             <input
-              className="w-full border rounded-xl px-4 py-2.5"
-              type="number"
-              placeholder="Nominal (Rp)"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              className="w-full border rounded-xl pl-10 pr-4 py-2.5 text-right"
+              type="text"
+              inputMode="numeric"
+              placeholder="0"
+              value={displayAmount}
+              onChange={handleAmountChange}
               required
             />
-            <input
-              className="w-full border rounded-xl px-4 py-2.5"
-              placeholder="Keterangan (opsional)"
+          </div>
+          <div>
+            <textarea
+              className="w-full border rounded-xl px-4 py-2.5 resize-none"
+              placeholder="Keterangan (opsional, maks 200 karakter)"
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={handleDescriptionChange}
+              rows={2}
+              maxLength={200}
             />
-            <button
-              type="submit"
-              className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium"
-            >
-              Catat
-            </button>
-          </form>
-        )}
+            <p className="text-xs text-slate-400 text-right mt-1">
+              {description.length}/200
+            </p>
+          </div>
+          <button
+            type="submit"
+            className="w-full bg-blue-600 text-white py-3 rounded-xl font-medium"
+          >
+            Catat
+          </button>
+        </form>
       </div>
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
