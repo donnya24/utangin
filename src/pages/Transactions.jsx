@@ -1,8 +1,14 @@
-import { useState } from "react";
-import { FileText, Plus } from "lucide-react";
+import { useState, useMemo } from "react";
+import { FileText, Plus, Check, RotateCcw, Trash2, Eye } from "lucide-react";
 import useTransactions from "../hooks/useTransactions";
 import TransactionDetailModal from "../components/TransactionDetailModal";
 import AddTransactionModal from "../components/AddTransactionModal";
+import {
+  toggleTransactionStatus,
+  deleteMultipleTransactions,
+} from "../services/firestoreService";
+import { formatRupiah } from "../utils/format";
+import Toast from "../components/Toast";
 
 function getInitials(name) {
   if (!name) return "??";
@@ -24,10 +30,6 @@ function getAvatarColor(name) {
   return colors[Math.abs(hash) % colors.length];
 }
 
-function formatRupiah(angka) {
-  return "Rp " + Math.abs(angka).toLocaleString("id-ID");
-}
-
 function formatDateShort(ts) {
   if (!ts) return "";
   const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -40,77 +42,201 @@ function formatDateShort(ts) {
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
 }
 
-function TransactionItem({ tx, onClick }) {
-  const remaining = tx.amount - (tx.paidAmount || 0);
-  return (
-    <div
-      onClick={() => onClick(tx)}
-      className="p-4 flex items-center justify-between hover:bg-slate-50 cursor-pointer"
-    >
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 rounded-full ${getAvatarColor(tx.contactName)} flex items-center justify-center font-bold text-sm`}
-        >
-          {getInitials(tx.contactName)}
-        </div>
-        <div>
-          <h4 className="font-semibold text-sm">{tx.contactName}</h4>
-          <p className="text-xs text-slate-400">
-            {tx.description || "Tanpa keterangan"} ·{" "}
-            {formatDateShort(tx.createdAt)}
-          </p>
-          {tx.status !== "lunas" && tx.paidAmount > 0 && (
-            <div className="mt-1 w-full bg-slate-200 rounded-full h-1.5 max-w-[120px]">
-              <div
-                className="bg-blue-500 h-1.5 rounded-full"
-                style={{
-                  width: `${Math.round((tx.paidAmount / tx.amount) * 100)}%`,
-                }}
-              ></div>
-            </div>
-          )}
-        </div>
-      </div>
-      <div className="text-right">
-        <span
-          className={`block font-bold text-sm ${tx.type === "piutang" ? "text-emerald-600" : "text-rose-600"}`}
-        >
-          {tx.type === "piutang" ? "+" : "-"} {formatRupiah(remaining)}
-        </span>
-        <span
-          className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full ${
-            tx.status === "lunas"
-              ? "bg-emerald-50 text-emerald-700"
-              : "bg-amber-50 text-amber-700"
-          }`}
-        >
-          {tx.status === "lunas"
-            ? "Lunas"
-            : tx.paidAmount > 0
-              ? "Cicilan"
-              : "Belum Lunas"}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 export default function Transactions() {
   const transactions = useTransactions();
   const [selectedTx, setSelectedTx] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [toast, setToast] = useState(null);
 
-  const piutang = transactions.filter((t) => t.type === "piutang");
-  const hutang = transactions.filter((t) => t.type === "hutang");
+  // Filter state
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState("");
+  const [filterType, setFilterType] = useState("all"); // 'all', 'piutang', 'hutang'
+  const [filterStatus, setFilterStatus] = useState("all"); // 'all', 'lunas', 'belum_lunas'
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState([]);
+
+  const filtered = useMemo(() => {
+    return transactions.filter((tx) => {
+      if (!tx.createdAt) return true;
+      const date = tx.createdAt.toDate
+        ? tx.createdAt.toDate()
+        : new Date(tx.createdAt);
+
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        if (date < start) return false;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        if (date > end) return false;
+      }
+      if (filterMonth && filterYear) {
+        const month = parseInt(filterMonth);
+        const year = parseInt(filterYear);
+        if (date.getMonth() !== month - 1 || date.getFullYear() !== year)
+          return false;
+      } else if (filterMonth) {
+        if (date.getMonth() !== parseInt(filterMonth) - 1) return false;
+      } else if (filterYear) {
+        if (date.getFullYear() !== parseInt(filterYear)) return false;
+      }
+
+      // Tipe filter
+      if (filterType === "piutang" && tx.type !== "piutang") return false;
+      if (filterType === "hutang" && tx.type !== "hutang") return false;
+
+      // Status filter
+      if (filterStatus === "lunas" && tx.status !== "lunas") return false;
+      if (filterStatus === "belum_lunas" && tx.status !== "belum_lunas")
+        return false;
+
+      return true;
+    });
+  }, [
+    transactions,
+    startDate,
+    endDate,
+    filterMonth,
+    filterYear,
+    filterType,
+    filterStatus,
+  ]);
+
+  const piutang = filtered.filter((t) => t.type === "piutang");
+  const hutang = filtered.filter((t) => t.type === "hutang");
+
+  const handleToggleStatus = async (txId, currentStatus) => {
+    try {
+      await toggleTransactionStatus(txId, currentStatus);
+      setToast({ message: "Status diperbarui", type: "success" });
+    } catch (err) {
+      setToast({ message: "Gagal: " + err.message, type: "error" });
+    }
+  };
+
+  const handleCheckboxToggle = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === filtered.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filtered.map((t) => t.id));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    if (
+      !confirm(
+        `Anda yakin ingin menghapus ${selectedIds.length} transaksi terpilih?`,
+      )
+    )
+      return;
+    try {
+      await deleteMultipleTransactions(selectedIds);
+      setSelectedIds([]);
+      setToast({
+        message: `${selectedIds.length} transaksi dihapus`,
+        type: "success",
+      });
+    } catch (err) {
+      setToast({ message: "Gagal: " + err.message, type: "error" });
+    }
+  };
+
+  const renderItem = (tx) => {
+    const remaining = tx.amount - (tx.paidAmount || 0);
+    const isSelected = selectedIds.includes(tx.id);
+    return (
+      <div
+        key={tx.id}
+        className="p-4 flex items-center justify-between hover:bg-slate-50"
+      >
+        <div className="flex items-center gap-3 flex-1">
+          <input
+            type="checkbox"
+            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            checked={isSelected}
+            onChange={() => handleCheckboxToggle(tx.id)}
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div
+            className="flex items-center gap-3 flex-1 cursor-pointer"
+            onClick={() => setSelectedTx(tx)}
+          >
+            <div
+              className={`w-10 h-10 rounded-full ${getAvatarColor(tx.contactName)} flex items-center justify-center font-bold text-sm`}
+            >
+              {getInitials(tx.contactName)}
+            </div>
+            <div>
+              <h4 className="font-semibold text-sm">{tx.contactName}</h4>
+              <p className="text-xs text-slate-400">
+                {tx.phone && "📱 " + tx.phone} · {formatDateShort(tx.createdAt)}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="text-right mr-2">
+            <span
+              className={`block font-bold text-sm ${tx.type === "piutang" ? "text-emerald-600" : "text-rose-600"}`}
+            >
+              {formatRupiah(remaining)}
+            </span>
+            <span
+              className={`inline-block px-2 py-0.5 text-[10px] font-semibold rounded-full ${tx.status === "lunas" ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}
+            >
+              {tx.status === "lunas" ? "Lunas" : "Belum Lunas"}
+            </span>
+          </div>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleToggleStatus(tx.id, tx.status);
+            }}
+            className={`p-2 rounded-full ${tx.status === "lunas" ? "bg-blue-100 text-blue-600" : "bg-green-100 text-green-600"}`}
+            title={
+              tx.status === "lunas" ? "Tandai belum lunas" : "Tandai lunas"
+            }
+          >
+            {tx.status === "lunas" ? (
+              <RotateCcw size={16} />
+            ) : (
+              <Check size={16} />
+            )}
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedTx(tx);
+            }}
+            className="p-2 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+            title="Lihat Detail"
+          >
+            <Eye size={16} />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <div>
           <h1 className="text-xl font-bold">Semua Transaksi</h1>
-          <p className="text-sm text-slate-500">
-            {transactions.length} transaksi
-          </p>
+          <p className="text-sm text-slate-500">{filtered.length} transaksi</p>
         </div>
         <button
           onClick={() => setShowAdd(true)}
@@ -120,20 +246,135 @@ export default function Transactions() {
         </button>
       </div>
 
-      {transactions.length === 0 ? (
+      {/* Filter Section */}
+      <div className="bg-white p-4 rounded-2xl border shadow-sm mb-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">Tipe</label>
+            <select
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <option value="all">Semua</option>
+              <option value="piutang">Piutang</option>
+              <option value="hutang">Hutang</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">Status</label>
+            <select
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="all">Semua</option>
+              <option value="lunas">Lunas</option>
+              <option value="belum_lunas">Belum Lunas</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">
+              Dari Tanggal
+            </label>
+            <input
+              type="date"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">
+              Sampai Tanggal
+            </label>
+            <input
+              type="date"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">Bulan</label>
+            <select
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+            >
+              <option value="">Semua</option>
+              {[...Array(12)].map((_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  {i + 1}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">Tahun</label>
+            <input
+              type="number"
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+              placeholder="2026"
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+            />
+          </div>
+        </div>
+        <button
+          onClick={() => {
+            setStartDate("");
+            setEndDate("");
+            setFilterMonth("");
+            setFilterYear("");
+            setFilterType("all");
+            setFilterStatus("all");
+          }}
+          className="mt-3 text-xs text-blue-600 hover:underline"
+        >
+          Reset Filter
+        </button>
+      </div>
+
+      {/* Multi-select actions */}
+      {selectedIds.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              className="w-4 h-4 rounded"
+              checked={selectedIds.length === filtered.length}
+              onChange={handleSelectAll}
+            />
+            <span className="text-sm font-medium text-blue-800">
+              {selectedIds.length} dipilih
+            </span>
+            <button
+              onClick={handleSelectAll}
+              className="text-xs text-blue-600 ml-2 hover:underline"
+            >
+              {selectedIds.length === filtered.length
+                ? "Batal Semua"
+                : "Pilih Semua"}
+            </button>
+          </div>
+          <button
+            onClick={handleDeleteSelected}
+            className="flex items-center gap-1 bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-red-700"
+          >
+            <Trash2 size={14} /> Hapus Terpilih
+          </button>
+        </div>
+      )}
+
+      {filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border p-10 text-center">
           <FileText size={48} className="mx-auto text-slate-300 mb-3" />
-          <h3 className="font-semibold text-lg">Belum Ada Transaksi</h3>
-          <button
-            onClick={() => setShowAdd(true)}
-            className="mt-4 bg-blue-600 text-white px-5 py-2 rounded-xl"
-          >
-            + Tambah Transaksi
-          </button>
+          <p className="text-slate-500">Tidak ada transaksi</p>
         </div>
       ) : (
         <>
-          {piutang.length > 0 && (
+          {filterType !== "hutang" && piutang.length > 0 && (
             <div className="mb-5">
               <h2 className="text-xs font-semibold uppercase text-slate-400 mb-3">
                 📥 Piutang (
@@ -141,18 +382,11 @@ export default function Transactions() {
                 lunas)
               </h2>
               <div className="bg-white rounded-2xl border divide-y shadow-sm">
-                {piutang.map((tx) => (
-                  <TransactionItem
-                    key={tx.id}
-                    tx={tx}
-                    onClick={setSelectedTx}
-                  />
-                ))}
+                {piutang.map((tx) => renderItem(tx))}
               </div>
             </div>
           )}
-
-          {hutang.length > 0 && (
+          {filterType !== "piutang" && hutang.length > 0 && (
             <div>
               <h2 className="text-xs font-semibold uppercase text-slate-400 mb-3">
                 📤 Hutang (
@@ -160,19 +394,12 @@ export default function Transactions() {
                 lunas)
               </h2>
               <div className="bg-white rounded-2xl border divide-y shadow-sm">
-                {hutang.map((tx) => (
-                  <TransactionItem
-                    key={tx.id}
-                    tx={tx}
-                    onClick={setSelectedTx}
-                  />
-                ))}
+                {hutang.map((tx) => renderItem(tx))}
               </div>
             </div>
           )}
         </>
       )}
-
       {selectedTx && (
         <TransactionDetailModal
           transaction={selectedTx}
@@ -180,6 +407,7 @@ export default function Transactions() {
         />
       )}
       {showAdd && <AddTransactionModal onClose={() => setShowAdd(false)} />}
+      {toast && <Toast {...toast} onClose={() => setToast(null)} />}
     </div>
   );
 }

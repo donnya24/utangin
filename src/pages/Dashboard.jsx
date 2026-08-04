@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Plus, ChevronRight, Inbox } from "lucide-react";
+import { Plus, Inbox } from "lucide-react";
 import useTransactions from "../hooks/useTransactions";
 import TransactionDetailModal from "../components/TransactionDetailModal";
 import AddTransactionModal from "../components/AddTransactionModal";
+import { useAuth } from "../context/AuthContext";
+import { formatRupiah } from "../utils/format";
 
 function getInitials(name) {
   if (!name) return "??";
@@ -24,10 +26,6 @@ function getAvatarColor(name) {
   return colors[Math.abs(hash) % colors.length];
 }
 
-function formatRupiah(angka) {
-  return "Rp " + Math.abs(angka).toLocaleString("id-ID");
-}
-
 function formatDateShort(ts) {
   if (!ts) return "";
   const d = ts.toDate ? ts.toDate() : new Date(ts);
@@ -42,6 +40,7 @@ function formatDateShort(ts) {
 
 export default function Dashboard() {
   const transactions = useTransactions();
+  const { user } = useAuth();
   const [selectedTx, setSelectedTx] = useState(null);
   const [showAddTx, setShowAddTx] = useState(false);
 
@@ -59,14 +58,24 @@ export default function Dashboard() {
     (s, t) => s + (t.amount - (t.paidAmount || 0)),
     0,
   );
-  const recentTx = transactions.slice(0, 8);
+
+  const totalLunas = transactions.filter((t) => t.status === "lunas").length;
+  const totalBelumLunas = transactions.filter(
+    (t) => t.status === "belum_lunas",
+  ).length;
+  const totalTransaksi = transactions.length;
+
+  // Hanya 5 transaksi terbaru
+  const recentTx = transactions.slice(0, 5);
 
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <div>
-          <h1 className="text-xl font-bold">Halo, Pemilik Toko 👋</h1>
-          <p className="text-sm text-slate-500">Ringkasan keuangan toko Anda</p>
+          <h1 className="text-xl font-bold">
+            Halo, {user?.displayName?.split(" ")[0] || "Pemilik"} 👋
+          </h1>
+          <p className="text-sm text-slate-500">Ringkasan keuangan Anda.</p>
         </div>
         <button
           onClick={() => setShowAddTx(true)}
@@ -77,47 +86,46 @@ export default function Dashboard() {
         </button>
       </div>
 
+      {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-white p-5 rounded-2xl border shadow-sm">
           <p className="text-xs font-semibold uppercase text-slate-400">
-            Total Piutang
+            Total Piutang (Belum Lunas)
           </p>
           <h3 className="text-2xl font-bold text-emerald-600 mt-1">
             {formatRupiah(totalPiutang)}
           </h3>
-          <div className="mt-3 pt-3 border-t flex justify-between text-xs text-slate-500">
-            <span>
-              Dari {new Set(unpaidPiutang.map((t) => t.contactId)).size}{" "}
-              pelanggan
-            </span>
-            <span className="text-blue-600 flex items-center">
-              Lihat detail <ChevronRight size={12} />
-            </span>
-          </div>
         </div>
         <div className="bg-white p-5 rounded-2xl border shadow-sm">
           <p className="text-xs font-semibold uppercase text-slate-400">
-            Total Hutang
+            Total Hutang (Belum Lunas)
           </p>
           <h3 className="text-2xl font-bold text-rose-600 mt-1">
             {formatRupiah(totalHutang)}
           </h3>
-          <div className="mt-3 pt-3 border-t flex justify-between text-xs text-slate-500">
-            <span>
-              Kepada {new Set(unpaidHutang.map((t) => t.contactId)).size}{" "}
-              supplier
-            </span>
-            <span className="text-blue-600 flex items-center">
-              Lihat detail <ChevronRight size={12} />
-            </span>
-          </div>
         </div>
       </div>
 
+      {/* Statistik kecil */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="bg-white p-3 rounded-xl border text-center">
+          <p className="text-xs text-slate-400">T. Transaksi</p>
+          <p className="text-xl font-bold text-blue-600">{totalTransaksi}</p>
+        </div>
+        <div className="bg-white p-3 rounded-xl border text-center">
+          <p className="text-xs text-slate-400">Lunas</p>
+          <p className="text-xl font-bold text-emerald-600">{totalLunas}</p>
+        </div>
+        <div className="bg-white p-3 rounded-xl border text-center">
+          <p className="text-xs text-slate-400">Belum Lunas</p>
+          <p className="text-xl font-bold text-amber-600">{totalBelumLunas}</p>
+        </div>
+      </div>
+
+      {/* Recent Transactions (max 5) */}
       <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-        <div className="p-4 border-b flex justify-between">
-          <h2 className="font-bold">Aktivitas Terakhir</h2>
-          <span className="text-sm text-blue-600">Semua Transaksi</span>
+        <div className="p-4 border-b">
+          <h2 className="font-bold">Aktivitas Terbaru</h2>
         </div>
         <div className="divide-y">
           {recentTx.length === 0 ? (
@@ -154,7 +162,6 @@ export default function Dashboard() {
                     <span
                       className={`block font-bold text-sm ${tx.type === "piutang" ? "text-emerald-600" : "text-rose-600"}`}
                     >
-                      {tx.type === "piutang" ? "+" : "-"}{" "}
                       {formatRupiah(remaining)}
                     </span>
                     <span
