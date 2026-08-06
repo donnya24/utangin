@@ -79,7 +79,6 @@ export default function TransactionDetailModal({ transaction, onClose }) {
             <span className="text-slate-500">Nama</span>
             <span className="font-medium">{currentTx.contactName}</span>
           </div>
-          // Di bagian detail, ganti jadi:
           {currentTx.phone ? (
             <div className="flex justify-between">
               <span className="text-slate-500">Telepon</span>
