@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { FileText, Plus, Check, RotateCcw, Trash2, Eye } from "lucide-react";
+import { FileText, Plus, Check, RotateCcw, Trash2, Eye, Search } from "lucide-react";
 import useTransactions from "../hooks/useTransactions";
 import TransactionDetailModal from "../components/TransactionDetailModal";
 import AddTransactionModal from "../components/AddTransactionModal";
@@ -49,6 +49,7 @@ export default function Transactions() {
   const [toast, setToast] = useState(null);
 
   // Filter state
+  const [searchQuery, setSearchQuery] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
@@ -61,6 +62,12 @@ export default function Transactions() {
 
   const filtered = useMemo(() => {
     return transactions.filter((tx) => {
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        if (!tx.contactName || !tx.contactName.toLowerCase().includes(q))
+          return false;
+      }
+
       if (!tx.createdAt) return true;
       const date = tx.createdAt.toDate
         ? tx.createdAt.toDate()
@@ -100,6 +107,7 @@ export default function Transactions() {
     });
   }, [
     transactions,
+    searchQuery,
     startDate,
     endDate,
     filterMonth,
@@ -248,7 +256,21 @@ export default function Transactions() {
       </div>
 
       {/* Filter Section */}
-      <div className="bg-white p-4 rounded-2xl border shadow-sm mb-4">
+      <div className="bg-white p-4 rounded-2xl border shadow-sm mb-4 space-y-3">
+        {/* Search by Name */}
+        <div className="relative">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+            <Search size={16} />
+          </span>
+          <input
+            type="text"
+            className="w-full border rounded-xl pl-9 pr-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+            placeholder="Cari berdasarkan nama pelanggan/supplier..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
           <div>
             <label className="text-xs text-slate-400 block mb-1">Tipe</label>
@@ -324,6 +346,7 @@ export default function Transactions() {
         </div>
         <button
           onClick={() => {
+            setSearchQuery("");
             setStartDate("");
             setEndDate("");
             setFilterMonth("");

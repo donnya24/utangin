@@ -20,7 +20,10 @@ export async function addTransaction(
   amount,
   type,
   description,
+  date,
 ) {
+  const txDate = date ? new Date(date + "T00:00:00") : new Date();
+
   // Jika guest, gunakan localStorage
   if (userId.startsWith("guest_")) {
     const tx = {
@@ -33,7 +36,7 @@ export async function addTransaction(
       type,
       status: "belum_lunas",
       description: description.trim(),
-      createdAt: new Date().toISOString(),
+      createdAt: txDate.toISOString(),
     };
     const guestTx = JSON.parse(
       localStorage.getItem("utangin_guest_tx") || "[]",
@@ -52,8 +55,61 @@ export async function addTransaction(
     type,
     status: "belum_lunas",
     description: description.trim(),
-    createdAt: serverTimestamp(),
+    createdAt: txDate,
   });
+}
+
+export async function updateTransaction(
+  transactionId,
+  name,
+  phone,
+  amount,
+  type,
+  description,
+  date,
+) {
+  const txDate = date ? new Date(date + "T00:00:00") : null;
+
+  if (transactionId.startsWith("guest_")) {
+    const guestTx = JSON.parse(
+      localStorage.getItem("utangin_guest_tx") || "[]",
+    );
+    const txIndex = guestTx.findIndex((t) => t.id === transactionId);
+    if (txIndex === -1) throw new Error("Transaksi tidak ditemukan");
+    const tx = guestTx[txIndex];
+    tx.contactName = name.trim();
+    tx.phone = phone.trim();
+    tx.amount = Number(amount);
+    tx.status = (tx.paidAmount || 0) >= tx.amount ? "lunas" : "belum_lunas";
+    tx.type = type;
+    tx.description = description.trim();
+    if (txDate) {
+      tx.createdAt = txDate.toISOString();
+    }
+    localStorage.setItem("utangin_guest_tx", JSON.stringify(guestTx));
+    return;
+  }
+
+  const txRef = doc(db, "transactions", transactionId);
+  const txSnap = await getDoc(txRef);
+  if (!txSnap.exists()) throw new Error("Transaksi tidak ditemukan");
+  const tx = txSnap.data();
+  const newAmount = Number(amount);
+  const newPaid = tx.paidAmount || 0;
+  const newStatus = newPaid >= newAmount ? "lunas" : "belum_lunas";
+
+  const updateData = {
+    contactName: name.trim(),
+    phone: phone.trim(),
+    amount: newAmount,
+    status: newStatus,
+    type,
+    description: description.trim(),
+  };
+  if (txDate) {
+    updateData.createdAt = txDate;
+  }
+  return updateDoc(txRef, updateData);
 }
 
 export async function addPayment(transactionId, paymentAmount) {

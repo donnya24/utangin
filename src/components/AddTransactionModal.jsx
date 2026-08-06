@@ -1,17 +1,36 @@
 import { useState } from "react";
 import { X } from "lucide-react";
-import { addTransaction } from "../services/firestoreService";
+import { addTransaction, updateTransaction } from "../services/firestoreService";
 import { useAuth } from "../context/AuthContext";
 import Toast from "./Toast";
 import { formatRupiahInput, parseRupiahInput } from "../utils/format";
 
-export default function AddTransactionModal({ onClose }) {
+const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getDateString = (ts) => {
+  if (!ts) return getTodayDateString();
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  if (isNaN(d.getTime())) return getTodayDateString();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+export default function AddTransactionModal({ transaction = null, onClose }) {
   const { user } = useAuth();
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [txType, setTxType] = useState("piutang");
-  const [displayAmount, setDisplayAmount] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState(transaction ? transaction.contactName : "");
+  const [phone, setPhone] = useState(transaction ? (transaction.phone || "") : "");
+  const [txType, setTxType] = useState(transaction ? transaction.type : "piutang");
+  const [displayAmount, setDisplayAmount] = useState(transaction ? formatRupiahInput(String(transaction.amount)) : "");
+  const [description, setDescription] = useState(transaction ? (transaction.description || "") : "");
+  const [date, setDate] = useState(transaction ? getDateString(transaction.createdAt) : getTodayDateString());
   const [toast, setToast] = useState(null);
 
   const handleAmountChange = (e) => {
@@ -35,15 +54,29 @@ export default function AddTransactionModal({ onClose }) {
       return;
     }
     try {
-      await addTransaction(
-        user.uid,
-        name,
-        phone,
-        rawAmount,
-        txType,
-        description,
-      );
-      setToast({ message: "Transaksi berhasil dicatat!", type: "success" });
+      if (transaction) {
+        await updateTransaction(
+          transaction.id,
+          name,
+          phone,
+          rawAmount,
+          txType,
+          description,
+          date,
+        );
+        setToast({ message: "Transaksi berhasil diperbarui!", type: "success" });
+      } else {
+        await addTransaction(
+          user.uid,
+          name,
+          phone,
+          rawAmount,
+          txType,
+          description,
+          date,
+        );
+        setToast({ message: "Transaksi berhasil dicatat!", type: "success" });
+      }
       setTimeout(onClose, 1500);
     } catch (err) {
       setToast({ message: "Gagal: " + err.message, type: "error" });
@@ -54,7 +87,9 @@ export default function AddTransactionModal({ onClose }) {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-md p-5 space-y-4 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center">
-          <h3 className="font-bold text-lg">Tambah Transaksi</h3>
+          <h3 className="font-bold text-lg">
+            {transaction ? "Edit Transaksi" : "Tambah Transaksi"}
+          </h3>
           <button onClick={onClose}>
             <X size={20} />
           </button>
@@ -85,6 +120,20 @@ export default function AddTransactionModal({ onClose }) {
               placeholder="0812-3456-7890"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
+            />
+          </div>
+
+          {/* Tanggal Transaksi */}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Tanggal Transaksi <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              className="w-full border rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
             />
           </div>
 
@@ -173,7 +222,7 @@ export default function AddTransactionModal({ onClose }) {
             type="submit"
             className="w-full bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-medium py-3 rounded-xl transition shadow-sm"
           >
-            Catat Transaksi
+            {transaction ? "Simpan Perubahan" : "Catat Transaksi"}
           </button>
         </form>
       </div>

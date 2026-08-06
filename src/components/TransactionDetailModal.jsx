@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { X, CheckCircle, RotateCcw, Trash2 } from "lucide-react";
+import { X, CheckCircle, RotateCcw, Trash2, Pencil } from "lucide-react";
 import PaymentModal from "./PaymentModal";
+import AddTransactionModal from "./AddTransactionModal";
 import {
   toggleTransactionStatus,
   deleteTransaction,
@@ -21,6 +22,7 @@ function formatDate(ts) {
 
 export default function TransactionDetailModal({ transaction, onClose }) {
   const [showPay, setShowPay] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
   const [toast, setToast] = useState(null);
   const [currentTx, setCurrentTx] = useState(transaction);
 
@@ -182,6 +184,13 @@ export default function TransactionDetailModal({ transaction, onClose }) {
           </button>
 
           <button
+            onClick={() => setShowEdit(true)}
+            className="w-full border-2 border-blue-200 text-blue-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-blue-50"
+          >
+            <Pencil size={18} /> Edit Transaksi
+          </button>
+
+          <button
             onClick={handleDelete}
             className="w-full border-2 border-rose-200 text-rose-600 py-3 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-rose-50"
           >
@@ -194,6 +203,12 @@ export default function TransactionDetailModal({ transaction, onClose }) {
         <PaymentModal
           transaction={currentTx}
           onClose={() => setShowPay(false)}
+        />
+      )}
+      {showEdit && (
+        <AddTransactionModal
+          transaction={currentTx}
+          onClose={() => setShowEdit(false)}
         />
       )}
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
