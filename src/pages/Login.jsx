@@ -21,7 +21,7 @@ export default function Login() {
     try {
       await signInWithGoogle();
       setToast({
-        message: "Berhasil masuk! Selamat datang 👋",
+        message: "elamat datang di utangin👋",
         type: "success",
       });
     } catch (error) {
